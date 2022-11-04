@@ -39,12 +39,12 @@ func (id ID) Value() (driver.Value, error) {
 }
 
 func (id *ID) Scan(src interface{}) error {
+	*id = ID{}
+
 	switch v := src.(type) {
 	case nil:
-		*id = ID{}
 	case []byte:
 		if len(v) == 0 {
-			*id = ID{}
 			return nil
 		}
 
@@ -55,7 +55,6 @@ func (id *ID) Scan(src interface{}) error {
 		copy((*id)[:], v)
 	case string:
 		if len(v) == 0 {
-			*id = ID{}
 			return nil
 		}
 
@@ -65,7 +64,6 @@ func (id *ID) Scan(src interface{}) error {
 		}
 
 		*id = i
-		return nil
 	}
 
 	return nil
