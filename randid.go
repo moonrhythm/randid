@@ -1,49 +1,72 @@
 package randid
 
 import (
-	"crypto/rand"
-	"encoding/binary"
+	"database/sql/driver"
 	"encoding/hex"
-	"io"
-	"sync"
-	"time"
+	"encoding/json"
 )
 
-const poolSize = 16 * 16
+type ID [16]byte
 
-var (
-	pool    [poolSize]byte
-	poolPos = poolSize
-	poolMu  sync.Mutex
-)
-
-func Generate() (string, error) {
-	var b [16]byte
-
-	binary.BigEndian.PutUint64(b[:], uint64(time.Now().UnixNano()))
-
-	poolMu.Lock()
-	if poolPos == poolSize {
-		_, err := io.ReadFull(rand.Reader, pool[:])
-		if err != nil {
-			poolMu.Unlock()
-			return "", err
-		}
-		poolPos = 0
-	}
-	copy(b[8:], pool[poolPos:poolPos+8])
-	poolPos += 8
-	poolMu.Unlock()
-
-	var s [32]byte
-	hex.Encode(s[:], b[:])
-	return string(s[:]), nil
+func FromString(s string) (ID, error) {
+	var id ID
+	_, err := hex.Decode(id[:], []byte(s))
+	return id, err
 }
 
-func MustGenerate() string {
-	id, err := Generate()
+func (id ID) String() string {
+	var s [32]byte
+	hex.Encode(s[:], id[:])
+	return string(s[:])
+}
+
+func (id ID) MarshalJSON() ([]byte, error) {
+	return json.Marshal(id.String())
+}
+
+func (id *ID) UnmarshalJSON(b []byte) error {
+	var s string
+	err := json.Unmarshal(b, &s)
 	if err != nil {
-		panic(err)
+		return err
 	}
-	return id
+	*id, err = FromString(s)
+	return err
+}
+
+func (id ID) Value() (driver.Value, error) {
+	return id.String(), nil
+}
+
+func (id *ID) Scan(src interface{}) error {
+	switch v := src.(type) {
+	case nil:
+		*id = ID{}
+	case []byte:
+		if len(v) == 0 {
+			*id = ID{}
+			return nil
+		}
+
+		if len(v) != 16 {
+			return id.Scan(string(v))
+		}
+
+		copy((*id)[:], v)
+	case string:
+		if len(v) == 0 {
+			*id = ID{}
+			return nil
+		}
+
+		i, err := FromString(v)
+		if err != nil {
+			return err
+		}
+
+		*id = i
+		return nil
+	}
+
+	return nil
 }
