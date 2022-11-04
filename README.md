@@ -24,7 +24,7 @@ import (
 )
 
 func main() {
-    id := randid.MustGenerate()
+    id := randid.MustGenerate().String()
     fmt.Println(id)
 }
 ```
