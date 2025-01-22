@@ -34,7 +34,7 @@ func Generate() (ID, error) {
 	poolPos += 8
 	poolMu.Unlock()
 
-	return ID(b), nil
+	return b, nil
 }
 
 func MustGenerate() ID {
@@ -43,4 +43,29 @@ func MustGenerate() ID {
 		panic(err)
 	}
 	return id
+}
+
+func GenerateAt(t time.Time) (ID, error) {
+	var b [16]byte = At(t)
+
+	poolMu.Lock()
+	if poolPos == poolSize {
+		_, err := io.ReadFull(rand.Reader, pool[:])
+		if err != nil {
+			poolMu.Unlock()
+			return ID{}, err
+		}
+		poolPos = 0
+	}
+	copy(b[8:], pool[poolPos:poolPos+8])
+	poolPos += 8
+	poolMu.Unlock()
+
+	return b, nil
+}
+
+func At(t time.Time) ID {
+	var b [16]byte
+	binary.BigEndian.PutUint64(b[:], uint64(t.UnixNano()))
+	return b
 }
